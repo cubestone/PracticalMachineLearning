@@ -1,0 +1,63 @@
+# Machine Learning Assignment- Deep learning at the gym
+
+## Jakub Czakon
+
+
+# Overview
+
+The objective of this project was to predict in which way the subject exercises based on the data gather from ones mobile device. We have started our analysis by cleaning the data since, as can be easily found out the majority of the variables are in fact almost empty. That is why we discarded those variables and proceeded to classify on the fragment of the dataset. We used Principal component analysis to extract important features of the data and than Gradient Boosted Model ("gbm") for the classification. 
+
+# Data Processing
+
+The dataset that we used in the analysis consists of 160 columns or variables and 19622 records.However,as can be easily seen the majority of the variables are in fact almost empty so we decided to discard all variables that had less than 622 measured records. After that, and when we excluded dates and ids of the subjects we were left with the dataset consisting of 53 variables: 52 of which were dependend variables and one of them was the outcome. The following code was used.
+
+```{r}
+pml<-read.csv("pml-training.csv")
+
+pml<-pml[,8:160]
+pml<-apply(pml,2,function(x) as.character(x))
+pml<-as.matrix(pml)
+pml[(pml=="") | (pml=="#DIV/0!")]<-NA
+pml<-as.data.frame(pml)
+
+good<-sapply(pml, function(x) sum(is.na(x)))<19000
+pml<-pml[,good]
+pml_var<-apply(pml[,1:52],2,function(x) as.numeric(x))
+pml_outcome<-data.frame(classe=as.factor(pml[,53]))
+pml<-data.frame(pml_var,pml_outcome)
+```
+
+# Modeling
+
+We divided our dataset to train and test.
+We used Gradient Boosted Model ("gbm") for this project. To cope with overfitting or to get the sense of what is the out of sample error we used cross validation. We have also extracted features from the model using Principal component analysis to make the computations quicker. The following code was used:
+
+```{r}
+
+library(caret)
+
+pml_id<-createDataPartition(pml$classe,p=0.75,list=F)
+pml_train<-pml[pml_id,]
+pml_test<-pml[-pml_id,]
+
+gbmFit <- train(classe ~ .,
+                data = pml_train,
+                method = c("gbm"),
+                preProcess = c("pca"),
+                trControl = trainControl(method = "cv", classProbs =  TRUE),
+                verbose=FALSE
+)
+```
+
+After we have used our model to predict on the previuosly prepared test set the accurace was as following:
+```{r}
+confusionMatrix(predict(gbmFit,pml_test),pml_test$classe)
+```
+
+Out of the sample error was calculated using the resampling sets. The accuracy measures for all the folds are presented below
+```{r}
+gbmFit$resample
+```
+
+That leaves us with the out of the sample error of `r sqrt(var(gbmFit$resample[[1]]))` for the accuracy.
+As it can be seen the predictive power is quite good and the out of the sample error reasonably strong leaving us with quite a good model.
